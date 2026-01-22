@@ -1,98 +1,126 @@
 import React, { useState } from 'react';
-import api from '../api'; // Import our new central api
+import api from '../api';
 
 function Admin() {
-  const [formData, setFormData] = useState({
+  const [linkInput, setLinkInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [secretKey, setSecretKey] = useState('');
+  
+  // The form data
+  const [product, setProduct] = useState({
     title: '',
     image_url: '',
     link: '',
     price: '',
-    category: ''
+    category: '',
+    description: ''
   });
 
-  // State for the password
-  const [secretKey, setSecretKey] = useState('');
+  const handleSmartAnalyze = async () => {
+    if (!linkInput) return alert("Please paste a link first!");
+    
+    setLoading(true);
+    setProduct({ ...product, title: '', description: 'AI is thinking...' }); // visual feedback
 
-  const handleChange = (e) => {
-    setFormData({...formData, [e.target.name]: e.target.value});
+    try {
+      const res = await api.post('/api/smart-scrape', { url: linkInput });
+      setProduct(res.data); // Auto-fill fields with AI data
+    } catch (err) {
+      alert("Analysis failed. Please enter details manually.");
+      console.error(err);
+      setProduct(prev => ({ ...prev, description: '' }));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     try {
-      // Use api.post instead of axios.post
-      await api.post('/api/add-product', formData, {
-        headers: { 
-            'Admin-Secret': secretKey 
-        } 
+      await api.post('/api/add-product', product, {
+        headers: { 'Admin-Secret': secretKey }
       });
-      alert('Product Added Successfully!');
-      // Clear form but keep the password
-      setFormData({ title: '', image_url: '', link: '', price: '', category: '' });
-    } catch (error) {
-      console.error(error);
-      alert('FAILED! Incorrect Secret Key or Server Error.');
+      alert('Product Published Successfully! 🚀');
+      // Reset form
+      setProduct({ title: '', image_url: '', link: '', price: '', category: '', description: '' });
+      setLinkInput('');
+    } catch (err) {
+      alert('Failed to save. Check your Admin Password.');
     }
   };
 
   return (
-    <div className="max-w-lg mx-auto bg-white p-8 rounded shadow-md mt-10">
-      <h2 className="text-2xl font-bold mb-6 text-center text-red-600">Admin Area</h2>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        
-        {/* --- PASSWORD FIELD --- */}
-        <div className="bg-red-50 p-4 rounded border border-red-200">
-            <label className="block text-sm font-bold text-red-700">Admin Password</label>
+    <div className="max-w-xl mx-auto p-6 bg-white shadow-xl rounded-xl mt-10">
+      <h1 className="text-3xl font-extrabold text-center mb-6 text-indigo-600">✨ AI Admin Panel</h1>
+
+      {/* 1. INPUT SECTION */}
+      <div className="mb-8 p-6 bg-indigo-50 rounded-xl border border-indigo-100">
+        <label className="block font-bold text-indigo-900 mb-2">Paste Product Link</label>
+        <div className="flex gap-2">
             <input 
-                type="password" 
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                placeholder="Enter Secret Key" 
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md p-2" 
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.target.value)}
+                placeholder="Paste Amazon/Flipkart link here..."
+                className="flex-grow p-3 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none"
             />
-            <p className="text-xs text-red-500 mt-1">
-                (Must match the 'Admin-Secret' in your server/app.py)
-            </p>
+            <button 
+                onClick={handleSmartAnalyze}
+                disabled={loading}
+                className="bg-indigo-600 text-white px-6 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md"
+            >
+                {loading ? 'Thinking...' : 'Analyze 🪄'}
+            </button>
         </div>
+        <p className="text-xs text-indigo-400 mt-2">The AI will fetch image, price, write a description, and tag the link.</p>
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Product Title</label>
-          <input name="title" onChange={handleChange} value={formData.title} required
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
+      {/* 2. PREVIEW & EDIT SECTION */}
+      {(product.image_url || product.title) && (
+          <form onSubmit={handleSave} className="space-y-4 animate-fade-in">
+            <div className="p-4 border rounded-lg bg-gray-50">
+                {product.image_url && (
+                    <img src={product.image_url} alt="Preview" className="h-40 mx-auto object-contain mb-4 bg-white rounded p-2 border"/>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
+                        <input className="w-full p-2 border rounded font-medium" value={product.category} onChange={e => setProduct({...product, category: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase">Price</label>
+                        <input className="w-full p-2 border rounded font-medium text-green-700" value={product.price} onChange={e => setProduct({...product, price: e.target.value})} />
+                    </div>
+                </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Image URL</label>
-          <input name="image_url" placeholder="https://..." onChange={handleChange} value={formData.image_url} required
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
+                <div className="mt-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Smart Title</label>
+                    <input className="w-full p-2 border rounded font-bold" value={product.title} onChange={e => setProduct({...product, title: e.target.value})} />
+                </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Affiliate Link</label>
-          <input name="link" placeholder="https://amzn.to/..." onChange={handleChange} value={formData.link} required
-            className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-        </div>
-
-        <div className="flex gap-4">
-            <div className="w-1/2">
-                <label className="block text-sm font-medium text-gray-700">Price</label>
-                <input name="price" placeholder="₹999" onChange={handleChange} value={formData.price} required
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+                <div className="mt-3">
+                    <label className="text-xs font-bold text-gray-500 uppercase">AI Description</label>
+                    <textarea className="w-full p-2 border rounded h-24 text-sm text-gray-700" value={product.description} onChange={e => setProduct({...product, description: e.target.value})} />
+                </div>
             </div>
-            <div className="w-1/2">
-                <label className="block text-sm font-medium text-gray-700">Category</label>
-                <input name="category" placeholder="Home" onChange={handleChange} value={formData.category} 
-                    className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
-            </div>
-        </div>
 
-        <button type="submit" 
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition font-bold">
-            Upload Product
-        </button>
-      </form>
+            <div className="mt-4">
+                <label className="text-sm font-bold text-red-500">Admin Password</label>
+                <input 
+                    type="password" 
+                    value={secretKey} 
+                    onChange={e => setSecretKey(e.target.value)} 
+                    className="w-full p-2 border border-red-200 rounded focus:border-red-500 outline-none" 
+                    placeholder="Enter Secret Key" 
+                    required
+                />
+            </div>
+
+            <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-green-700 shadow-lg transform hover:-translate-y-0.5 transition-all">
+                Publish Product 🚀
+            </button>
+          </form>
+      )}
     </div>
   );
 }
