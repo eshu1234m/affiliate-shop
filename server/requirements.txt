@@ -5,3 +5,4 @@ requests
 beautifulsoup4
 google-generativeai
 gunicorn
+psycopg2-binary
