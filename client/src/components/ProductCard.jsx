@@ -41,7 +41,7 @@ function ProductCard({ product }) {
             rel="noopener noreferrer"
             className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-md hover:shadow-indigo-500/30 text-sm"
           >
-            Buy Now
+            View Product
           </a>
         </div>
       </div>
