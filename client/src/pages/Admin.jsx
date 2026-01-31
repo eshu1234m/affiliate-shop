@@ -20,11 +20,11 @@ function Admin() {
     if (!linkInput) return alert("Please paste a link first!");
     
     setLoading(true);
-    setProduct({ ...product, title: '', description: 'AI is thinking...' }); // visual feedback
+    setProduct({ ...product, title: 'AI Scanned... Writing Title...', description: 'AI is thinking...' }); 
 
     try {
       const res = await api.post('/api/smart-scrape', { url: linkInput });
-      setProduct(res.data); // Auto-fill fields with AI data
+      setProduct(res.data); 
     } catch (err) {
       alert("Analysis failed. Please enter details manually.");
       console.error(err);
@@ -41,7 +41,6 @@ function Admin() {
         headers: { 'Admin-Secret': secretKey }
       });
       alert('Product Published Successfully! 🚀');
-      // Reset form
       setProduct({ title: '', image_url: '', link: '', price: '', category: '', description: '' });
       setLinkInput('');
     } catch (err) {
@@ -71,12 +70,17 @@ function Admin() {
                 {loading ? 'Thinking...' : 'Analyze 🪄'}
             </button>
         </div>
-        <p className="text-xs text-indigo-400 mt-2">The AI will fetch image, price, write a description, and tag the link.</p>
       </div>
 
       {/* 2. PREVIEW & EDIT SECTION */}
       {(product.image_url || product.title) && (
-          <form onSubmit={handleSave} className="space-y-4 animate-fade-in">
+          <form onSubmit={handleSave} className="space-y-4 animate-fade-in" autoComplete="off">
+            
+            {/* --- TRICK TO STOP EMAIL AUTOFILL --- */}
+            <input type="text" name="fake-email" style={{display: 'none'}} autoComplete="username" />
+            <input type="password" name="fake-password" style={{display: 'none'}} autoComplete="current-password" />
+            {/* ------------------------------------ */}
+
             <div className="p-4 border rounded-lg bg-gray-50">
                 {product.image_url && (
                     <img src={product.image_url} alt="Preview" className="h-40 mx-auto object-contain mb-4 bg-white rounded p-2 border"/>
@@ -99,8 +103,14 @@ function Admin() {
                 </div>
 
                 <div className="mt-3">
-                    <label className="text-xs font-bold text-gray-500 uppercase">AI Description</label>
-                    <textarea className="w-full p-2 border rounded h-24 text-sm text-gray-700" value={product.description} onChange={e => setProduct({...product, description: e.target.value})} />
+                    <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                    <textarea 
+                        name="product-description"
+                        autoComplete="off"
+                        className="w-full p-2 border rounded h-24 text-sm text-gray-700" 
+                        value={product.description} 
+                        onChange={e => setProduct({...product, description: e.target.value})} 
+                    />
                 </div>
             </div>
 
@@ -113,6 +123,7 @@ function Admin() {
                     className="w-full p-2 border border-red-200 rounded focus:border-red-500 outline-none" 
                     placeholder="Enter Secret Key" 
                     required
+                    autoComplete="new-password"
                 />
             </div>
 
