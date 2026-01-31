@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 
 function Admin() {
@@ -6,6 +6,9 @@ function Admin() {
   const [loading, setLoading] = useState(false);
   const [secretKey, setSecretKey] = useState('');
   
+  // New: List of existing products for management
+  const [existingProducts, setExistingProducts] = useState([]);
+
   // The form data
   const [product, setProduct] = useState({
     title: '',
@@ -15,6 +18,20 @@ function Admin() {
     category: '',
     description: ''
   });
+
+  // Fetch products on load
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get('/api/products');
+      setExistingProducts(res.data);
+    } catch (err) {
+      console.error("Error fetching products:", err);
+    }
+  };
 
   const handleSmartAnalyze = async () => {
     if (!linkInput) return alert("Please paste a link first!");
@@ -43,13 +60,35 @@ function Admin() {
       alert('Product Published Successfully! 🚀');
       setProduct({ title: '', image_url: '', link: '', price: '', category: '', description: '' });
       setLinkInput('');
+      fetchProducts(); // Refresh the list below
     } catch (err) {
       alert('Failed to save. Check your Admin Password.');
     }
   };
 
+  // NEW: Delete Handler
+  const handleDelete = async (id) => {
+    if (!secretKey) {
+        alert("Please enter the Admin Password in the field above first!");
+        return;
+    }
+    
+    if (!window.confirm("Are you sure you want to delete this product?")) return;
+
+    try {
+      await api.delete(`/api/delete-product/${id}`, {
+        headers: { 'Admin-Secret': secretKey }
+      });
+      alert("Product Deleted!");
+      fetchProducts(); // Refresh the list
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete. Check your Admin Password.");
+    }
+  };
+
   return (
-    <div className="max-w-xl mx-auto p-6 bg-white shadow-xl rounded-xl mt-10">
+    <div className="max-w-xl mx-auto p-6 bg-white shadow-xl rounded-xl mt-10 mb-10">
       <h1 className="text-3xl font-extrabold text-center mb-6 text-indigo-600">✨ AI Admin Panel</h1>
 
       {/* 1. INPUT SECTION */}
@@ -121,7 +160,7 @@ function Admin() {
                     value={secretKey} 
                     onChange={e => setSecretKey(e.target.value)} 
                     className="w-full p-2 border border-red-200 rounded focus:border-red-500 outline-none" 
-                    placeholder="Enter Secret Key" 
+                    placeholder="Enter Secret Key to Save or Delete" 
                     required
                     autoComplete="new-password"
                 />
@@ -132,6 +171,34 @@ function Admin() {
             </button>
           </form>
       )}
+
+      {/* 3. MANAGE PRODUCTS SECTION */}
+      <div className="mt-16 border-t pt-8">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Manage Existing Products</h2>
+        <div className="space-y-3">
+            {existingProducts.length === 0 && <p className="text-gray-500 text-sm">No products found.</p>}
+            
+            {existingProducts.map(p => (
+                <div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:shadow-sm transition">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <img src={p.image_url} alt="tiny" className="h-10 w-10 object-contain bg-white rounded border" />
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm text-gray-700 truncate w-32 sm:w-60" title={p.title}>
+                                {p.title}
+                            </span>
+                            <span className="text-xs text-green-600">{p.price}</span>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => handleDelete(p.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold transition"
+                    >
+                        Delete
+                    </button>
+                </div>
+            ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,23 +8,29 @@ from flask_cors import CORS
 import google.generativeai as genai
 
 app = Flask(__name__)
+# Allow requests from anywhere
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# --- CONFIG ---
+# --- CONFIGURATION ---
+
+# 1. Database
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///products.db')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# 2. AI CONFIGURATION
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# 3. YOUR AFFILIATE TAG
 MY_AMAZON_TAG = "eshwardeals-21" 
 
 db = SQLAlchemy(app)
 
+# --- DATABASE MODEL ---
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -37,9 +43,10 @@ class Product(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- HELPERS ---
+# --- HELPER FUNCTIONS ---
 
 def convert_to_affiliate(url, tag):
+    """Adds your Amazon tag to the link automatically"""
     if "amazon" in url or "amzn" in url:
         if "tag=" in url: return url
         separator = "&" if "?" in url else "?"
@@ -48,7 +55,7 @@ def convert_to_affiliate(url, tag):
 
 def ai_enhance_product(title, raw_price):
     if not GEMINI_API_KEY:
-        return {"category": "General", "description": "AI Key Missing", "clean_title": title}
+        return {"category": "General", "description": "AI Key missing.", "clean_title": title}
     
     try:
         model = genai.GenerativeModel('gemini-2.0-flash')
@@ -70,38 +77,21 @@ def ai_enhance_product(title, raw_price):
         print(f"AI Error: {e}")
         return {"category": "General", "description": "", "clean_title": title}
 
-# --- ROBUST IMAGE FINDER ---
 def find_best_image(soup):
     """Tries multiple methods to find the product image"""
-    
-    # Method 1: Open Graph (Standard for social media)
     img = soup.find("meta", property="og:image")
-    if img and img.get("content"):
-        return img["content"]
-
-    # Method 2: Amazon Specific (landingImage)
+    if img and img.get("content"): return img["content"]
     img = soup.find(id="landingImage")
-    if img and img.get("src"):
-        return img["src"]
-
-    # Method 3: Amazon Specific (imgBlkFront)
+    if img and img.get("src"): return img["src"]
     img = soup.find(id="imgBlkFront")
-    if img and img.get("src"):
-        return img["src"]
-        
-    # Method 4: High Res generic
+    if img and img.get("src"): return img["src"]
     img = soup.find(id="hiResImg")
-    if img and img.get("src"):
-        return img["src"]
-
-    # Method 5: First large image in the main container
+    if img and img.get("src"): return img["src"]
     img_container = soup.find(id="imgTagWrapperId")
     if img_container:
         img = img_container.find("img")
-        if img and img.get("src"):
-            return img["src"]
-
-    return "" # Failed to find image
+        if img and img.get("src"): return img["src"]
+    return ""
 
 # --- ROUTES ---
 
@@ -110,11 +100,9 @@ def smart_scrape():
     data = request.json
     url = data.get('url')
     
-    # Strong Headers to prevent blocking
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive"
     }
 
@@ -122,25 +110,19 @@ def smart_scrape():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # 1. Get Title
         title_tag = soup.find(id='productTitle')
         raw_title = title_tag.get_text().strip() if title_tag else soup.title.string
-
-        # 2. Get Image (Using new robust function)
         image_url = find_best_image(soup)
-
-        # 3. Get Price
         price_whole = soup.find(class_='a-price-whole')
         raw_price = f"₹{price_whole.get_text().strip()}" if price_whole else "Check Price"
 
-        # 4. Process AI & Link
         smart_link = convert_to_affiliate(url, MY_AMAZON_TAG)
         ai_data = ai_enhance_product(raw_title, raw_price)
 
         return jsonify({
             "title": ai_data.get('clean_title', raw_title),
             "original_title": raw_title,
-            "image_url": image_url, # Now uses the robust finder
+            "image_url": image_url,
             "price": raw_price,
             "link": smart_link,
             "category": ai_data.get('category', 'General'),
@@ -148,7 +130,6 @@ def smart_scrape():
         })
 
     except Exception as e:
-        print(f"Scrape Error: {e}")
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/products', methods=['GET'])
@@ -187,6 +168,22 @@ def add_product():
     db.session.add(new_product)
     db.session.commit()
     return jsonify({"message": "Product saved!"})
+
+# NEW: Delete Route
+@app.route('/api/delete-product/<int:id>', methods=['DELETE'])
+def delete_product(id):
+    secret = request.headers.get('Admin-Secret')
+    correct_password = os.environ.get('ADMIN_PASSWORD', 'my_super_secret_password_123')
+    
+    if secret != correct_password:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    product = Product.query.get(id)
+    if product:
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({"message": "Deleted"})
+    return jsonify({"error": "Not found"}), 404
 
 @app.route('/', methods=['GET'])
 def home():
