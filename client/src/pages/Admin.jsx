@@ -6,7 +6,7 @@ function Admin() {
   const [loading, setLoading] = useState(false);
   const [secretKey, setSecretKey] = useState('');
   
-  // New: List of existing products for management
+  // List of existing products
   const [existingProducts, setExistingProducts] = useState([]);
 
   // The form data
@@ -53,6 +53,8 @@ function Admin() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!secretKey) return alert("Please enter the Admin Password at the top!");
+
     try {
       await api.post('/api/add-product', product, {
         headers: { 'Admin-Secret': secretKey }
@@ -60,16 +62,15 @@ function Admin() {
       alert('Product Published Successfully! 🚀');
       setProduct({ title: '', image_url: '', link: '', price: '', category: '', description: '' });
       setLinkInput('');
-      fetchProducts(); // Refresh the list below
+      fetchProducts(); 
     } catch (err) {
       alert('Failed to save. Check your Admin Password.');
     }
   };
 
-  // NEW: Delete Handler
   const handleDelete = async (id) => {
     if (!secretKey) {
-        alert("Please enter the Admin Password in the field above first!");
+        alert("Please enter the Admin Password at the top of the page first!");
         return;
     }
     
@@ -80,7 +81,7 @@ function Admin() {
         headers: { 'Admin-Secret': secretKey }
       });
       alert("Product Deleted!");
-      fetchProducts(); // Refresh the list
+      fetchProducts(); 
     } catch (err) {
       console.error(err);
       alert("Failed to delete. Check your Admin Password.");
@@ -90,6 +91,19 @@ function Admin() {
   return (
     <div className="max-w-xl mx-auto p-6 bg-white shadow-xl rounded-xl mt-10 mb-10">
       <h1 className="text-3xl font-extrabold text-center mb-6 text-indigo-600">✨ AI Admin Panel</h1>
+
+      {/* 0. AUTH SECTION (ALWAYS VISIBLE NOW) */}
+      <div className="mb-6 bg-red-50 p-4 rounded-xl border border-red-100">
+        <label className="block text-sm font-bold text-red-500 mb-1">Admin Password (Required for all actions)</label>
+        <input 
+            type="password" 
+            value={secretKey} 
+            onChange={e => setSecretKey(e.target.value)} 
+            className="w-full p-2 border border-red-200 rounded focus:border-red-500 outline-none bg-white" 
+            placeholder="Enter Secret Key here..." 
+            autoComplete="new-password"
+        />
+      </div>
 
       {/* 1. INPUT SECTION */}
       <div className="mb-8 p-6 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -115,10 +129,8 @@ function Admin() {
       {(product.image_url || product.title) && (
           <form onSubmit={handleSave} className="space-y-4 animate-fade-in" autoComplete="off">
             
-            {/* --- TRICK TO STOP EMAIL AUTOFILL --- */}
             <input type="text" name="fake-email" style={{display: 'none'}} autoComplete="username" />
             <input type="password" name="fake-password" style={{display: 'none'}} autoComplete="current-password" />
-            {/* ------------------------------------ */}
 
             <div className="p-4 border rounded-lg bg-gray-50">
                 {product.image_url && (
@@ -153,19 +165,6 @@ function Admin() {
                 </div>
             </div>
 
-            <div className="mt-4">
-                <label className="text-sm font-bold text-red-500">Admin Password</label>
-                <input 
-                    type="password" 
-                    value={secretKey} 
-                    onChange={e => setSecretKey(e.target.value)} 
-                    className="w-full p-2 border border-red-200 rounded focus:border-red-500 outline-none" 
-                    placeholder="Enter Secret Key to Save or Delete" 
-                    required
-                    autoComplete="new-password"
-                />
-            </div>
-
             <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-green-700 shadow-lg transform hover:-translate-y-0.5 transition-all">
                 Publish Product 🚀
             </button>
@@ -191,7 +190,7 @@ function Admin() {
                     </div>
                     <button 
                         onClick={() => handleDelete(p.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold transition"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded text-sm font-bold transition border border-red-200"
                     >
                         Delete
                     </button>
